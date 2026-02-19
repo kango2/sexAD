@@ -39,7 +39,7 @@ SPI15112_female_analysis <- deSeq2Analysis(SPI15112_female_readIn,
                             geneNames = T, 
                             basicSummary = T, 
                             varInterest = "group", 
-                            csvOut = "/g/data/xl04/eh8642/RNAseq_run/deSeq_results", 
+                            csvOut = "/g/data/xl04/eh8642/RNAseq_run/deSeq_results/", 
                             nameOut = "SPI15112")
 
 

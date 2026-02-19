@@ -2,7 +2,9 @@ deSeq2Analysis <- function(deSeq2Input,
                            geneNames=FALSE, 
                            varInterest=NA,
                            basicSummary=TRUE, 
-                           sigValue=0.1){
+                           sigValue=0.1, 
+                           csvOut=NULL, 
+                           nameOut=NULL){
   # Error checks 
   if(!(type(deSeq2Input)=="list")){
     stop("deSeq2 input incorrect format")
@@ -11,13 +13,15 @@ deSeq2Analysis <- function(deSeq2Input,
     #  if(!(inputValues %in% names(deSeq2Input))){
     #      stop("deSe2 input doesn't have all correct inputs")
     #  }
-  }
+  }       
   
   deSeq2AnalysisOutput<-NULL
   contrastTable <- deSeq2Input[["contrastTable"]]
   contrastTable$group <- as.factor(contrastTable$group)
-  quantsfInput <- deSeq2Input[["quantInput"]]
-  tx2gene <- deSeq2Input[["tx2gene"]]
+  quantsfInput <- deSeq2Input[["quantInput"]] %>%
+    unique()
+  tx2gene <- deSeq2Input[["tx2gene"]] %>%
+    unique()
   design_formula <- as.formula(paste("~", varInterest))
   
   if(is.na(varInterest)){
@@ -39,7 +43,7 @@ deSeq2Analysis <- function(deSeq2Input,
   )
   
   if(geneNames){
-    gene_names <- mergedtx2gene |>
+    gene_names <- tx2gene |>
       dplyr::select(gene_id, gene_name) |>
       dplyr::distinct()
     rowData(dds)$gene_name <- gene_names$gene_name[
@@ -51,6 +55,7 @@ deSeq2Analysis <- function(deSeq2Input,
       rowData(dds)$gene_name
     )
     rowData(dds)$gene_name <- make.unique(rowData(dds)$gene_name)
+    rownames(dds) <- rowData(dds)$gene_name
   }
   
   smallestGroup <- 0
@@ -77,26 +82,34 @@ deSeq2Analysis <- function(deSeq2Input,
   
   deSeq2AnalysisOutput[["dds"]] <- dds
   
-  if(geneNames){
-    resOrdered <- as.data.frame(resOrdered) |>
-      tibble::rownames_to_column("gene_id") |>
-      dplyr::mutate(
-        gene_name = rowData(dds)$gene_name[
-          match(gene_id, rownames(dds))
-        ]
-      ) |>
-      dplyr::relocate(gene_name, .before = gene_id)
-    
-    resSig <- subset(resOrdered, padj < sigValue)
-    resSig <- as.data.frame(resSig) |>
-      tibble::rownames_to_column("gene_id") |>
-      dplyr::mutate(
-        gene_name = rowData(dds)$gene_name[
-          match(gene_id, rownames(dds))
-        ]
-      ) |>
-      dplyr::relocate(gene_name, .before = gene_id)
-    
+  #if(geneNames){
+  #  resOrdered <- as.data.frame(resOrdered) |>
+  #    tibble::rownames_to_column("gene_id") |>
+  #    dplyr::mutate(
+  #      gene_name = rowData(dds)$gene_name[
+  #        match(gene_id, rownames(dds))
+  #      ]
+  #    ) |>
+  #    dplyr::relocate(gene_name, .before = gene_id)
+  #  
+  #  resSig <- subset(resOrdered, padj < sigValue)
+  #  resSig <- as.data.frame(resSig) |>
+  #    tibble::rownames_to_column("gene_id") |>
+  #    dplyr::mutate(
+  #      gene_name = rowData(dds)$gene_name[
+  #        match(gene_id, rownames(dds))
+  #      ]
+  #    ) |>
+  #    dplyr::relocate(gene_name, .before = gene_id)
+  #}
+  
+  if(!(is.na(csvOut))){
+    write.csv(as.data.frame(res), 
+              file=paste0(csvOut,nameOut,"_res.csv"))
+    write.csv(as.data.frame(resOrdered), 
+              file=paste0(csvOut,nameOut,"_resOrdered.csv"))
+    write.csv(as.data.frame(resSig), 
+              file=paste0(csvOut,nameOut,"_resSig.csv"))
   }
   
   deSeq2AnalysisOutput[["results"]] <- res
