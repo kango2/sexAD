@@ -1,11 +1,3 @@
-library(tidyverse)
-library(tximport)
-library(tidyverse)
-library("vsn")
-library("pheatmap")
-library("apeglm")
-library(org.Hs.eg.db)
-library(AnnotationDbi)
 
 make_fastq_sample_sheet <- function(filepaths,
                                     output_csv = "samples.csv",
@@ -144,16 +136,6 @@ deSeq2Input <- function(bamInput,
 
 }
 
-bam_prac <- "/g/data/xl04/eh8642/RNAseq_run/Female_RNAseq_out_run2/workdirectory/star_salmon"
-quantPrac <- "/g/data/xl04/eh8642/RNAseq_run/Female_RNAseq_out_run2/workdirectory/star_salmon"
-Femalecontrast_2
-tx2gene <- "/g/data/xl04/eh8642/RNAseq_run/Female_RNAseq_out_run2/workdirectory/star_salmon/tx2gene.tsv"
-
-practice <- deSeq2Input(bam_prac, 
-                        contrastInput=Femalecontrast_2, 
-                        quantPrac, 
-                        tx2gene, 
-                        factorKeep="ALL")
 
 deSeq2Analysis <- function(deSeq2Input, 
                            geneNames=FALSE, 
@@ -276,12 +258,6 @@ deSeq2Analysis <- function(deSeq2Input,
   return(deSeq2AnalysisOutput)
 }
 
-practice2 <- deSeq2Analysis(practice, 
-                            geneNames = F, 
-                            basicSummary = T, 
-                            varInterest = "group")
-
-
 
 deseq2Plots <- function(dds,
                         results,
@@ -330,20 +306,77 @@ deseq2Plots <- function(dds,
   
 }
 
-plotPrac <- deseq2Plots(practice2$dds, 
-                        practice2$results, 
-                        intGroup="group")
-plotPrac$plotCounts
+pairwisePlot <- function(ds2results,
+                         yAxis,
+                         annotation.gtf,
+                         specChr){
+  
+  # Get gene co-ordinates 
+  txdb <- makeTxDbFromGFF(annotation.gtf) %>%
+    genes() 
+  
+  txdb <- txdb[seqnames(genes_gr) %in% specChr]
+  
+  
+  overLap <- rownames(ds2results) %>%
+    {. <- .[which(. %in% txdb$gene_id)];.}
+  
+  txdb <- txdb[txdb$gene_id%in%overLap]
+  
+  rangesSelect <- ranges(txdb) %>%
+    as.data.frame() %>%
+    {.$mean <- rep(0, nrow(.));.}
+  
+  for(i in 1:nrow(rangesSelect)){
+    rangesSelect[i,5] <- (rangesSelect[i,1]+rangesSelect[i,2])/2
+  }
+  
+  resultsMapping <- ds2results %>%
+    {. <- .[rownames(.)%in%overLap,]} %>%
+    as.data.frame() %>%
+    {.$location <- rangesSelect$mean;.} %>%
+    {.$location <- .$location/1000000;.} %>%
+    {.$sig <- rep("UnSig",nrow(.));.}
+  
+  # Plot 
+  resultsMapPlot <- ggplot(data = resultsMapping,mapping = aes(location,resultsMapping[,yAxis]))+
+    geom_point()+
+    ylim(min(resultsMapping[,yAxis]),max(resultsMapping[,yAxis])) + 
+    labs(
+      x = "X-chrom Location (Mbp)",
+      y = paste0("F/M ratio ",yAxis),
+      color = "Legend Title" # Changes the title for the 'color' aesthetic
+    )
+  
+  
+  return(resultsMapPlot)
+  
+}
 
-
-
-
-
-asdf <- plotMA(practice2$results, ylim=c(-2,2))
-class(asdf)
-
-
-
+volcanoplot <- function(DESeq2Results, 
+                        log2FoldUp=0.5, 
+                        pvalSig=0.05){
+  
+  de <- DESeq2Results
+  de$diffexpressed <- "NO"
+  de$diffexpressed[de$log2FoldChange > log2FoldUp & de$pvalue < pvalSig] <- "UP"
+  de$diffexpressed[de$log2FoldChange < -log2FoldUp & de$pvalue < pvalSig] <- "DOWN"
+  
+  mycolors <- c("blue", "red", "black")
+  names(mycolors) <- c("DOWN", "UP", "NO")
+  
+  de$gene_symbol <- rownames(de)
+  de$delabel <- NA
+  de$delabel[de$diffexpressed != "NO"] <- de$gene_symbol[de$diffexpressed != "NO"]
+  
+  plotOut <- ggplot(data=de, aes(x=log2FoldChange, y=-log10(pvalue), col=diffexpressed, label=delabel)) + 
+    geom_point() + 
+    theme_minimal() +
+    geom_text()
+  
+  return(plotOut)
+  
+}
 
 
 
