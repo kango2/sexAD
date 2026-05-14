@@ -1,0 +1,28 @@
+Basic qc, pulling the following: 
+    - total_reads,mapped_reads,aligned_per,gc_content,num_bp
+        - multiqc_general_stats.txt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

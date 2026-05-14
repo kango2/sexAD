@@ -1,0 +1,43 @@
+---
+ workdir: /g/data/xl04/eh8642/RNAseq_run/qc_pipeline_practice
+
+ nextflow_out: /g/data/xl04/eh8642/RNAseq_run/SPI15112_run/Male/batch2
+
+ metadata: /g/data/xl04/eh8642/RNAseq_run/samplesheets/SPI5112_samplesheet_malesBatch2.csv
+
+ multiqc_args:
+   - samtools_stats-reads_mapped
+   - star-total_reads
+   - samtools_stats-reads_mapped_percent
+   - total_passed
+   - total_failed
+   - lncRNA
+   - unique_percent
+
+ plot_metrics:
+   - samtools_stats-reads_mapped
+   - star-total_reads
+   - samtools_stats-reads_mapped_percent
+   - unique_percent
+   - total_passed
+
+ plot_panels:
+   bar:
+     - samtools_stats-reads_mapped
+     - star-total_reads
+     - samtools_stats-reads_mapped_percent
+     - unique_percent
+     - total_passed
+   heatmap:
+     - samtools_stats-reads_mapped
+     - star-total_reads
+     - samtools_stats-reads_mapped_percent
+     - unique_percent
+     - total_passed
+   scatter:
+     - x: star-total_reads
+       y: samtools_stats-reads_mapped
+       label: total_reads_vs_mapped
+     - x: samtools_stats-reads_mapped_percent
+       y: unique_percent
+       label: mapped_percent_vs_unique_percent

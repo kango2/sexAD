@@ -1,0 +1,9 @@
+samtools_stats-reads_mapped
+star-total_reads
+samtools_stats-reads_mapped_percent
+
+
+
+
+
+
