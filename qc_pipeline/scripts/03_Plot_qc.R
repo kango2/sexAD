@@ -1,13 +1,18 @@
 inputs <- commandArgs(trailingOnly = TRUE)
 workdir <- inputs[1]
+metadata_path <- paste0(workdir, "/metadata_input.csv")
+metadata_vars <- character(0)
+metadata_plot_metrics <- character(0)
 plot_metrics <- character(0)
 plot_bar <- character(0)
 plot_heatmap <- character(0)
 plot_scatter <- character(0)
-if (length(inputs) >= 2 && nzchar(inputs[2])) plot_metrics <- strsplit(inputs[2], " ")[[1]]
-if (length(inputs) >= 3 && nzchar(inputs[3])) plot_bar <- strsplit(inputs[3], " ")[[1]]
-if (length(inputs) >= 4 && nzchar(inputs[4])) plot_heatmap <- strsplit(inputs[4], " ")[[1]]
-if (length(inputs) >= 5 && nzchar(inputs[5])) plot_scatter <- strsplit(inputs[5], "\\|", fixed = FALSE)[[1]]
+if (length(inputs) >= 2 && nzchar(inputs[2])) metadata_vars <- strsplit(inputs[2], " ")[[1]]
+if (length(inputs) >= 3 && nzchar(inputs[3])) metadata_plot_metrics <- strsplit(inputs[3], " ")[[1]]
+if (length(inputs) >= 4 && nzchar(inputs[4])) plot_metrics <- strsplit(inputs[4], " ")[[1]]
+if (length(inputs) >= 5 && nzchar(inputs[5])) plot_bar <- strsplit(inputs[5], " ")[[1]]
+if (length(inputs) >= 6 && nzchar(inputs[6])) plot_heatmap <- strsplit(inputs[6], " ")[[1]]
+if (length(inputs) >= 7 && nzchar(inputs[7])) plot_scatter <- strsplit(inputs[7], "\\|", fixed = FALSE)[[1]]
 
 qc_path <- paste0(workdir, "/02_Metadata/combined_qc.tsv")
 if (!file.exists(qc_path)) {
@@ -26,7 +31,19 @@ if (!"Sample" %in% colnames(qc)) {
   stop("combined_qc.tsv must contain a Sample column")
 }
 
-plot_dir <- paste0(workdir, "/04_Plots")
+meta <- NULL
+if (file.exists(metadata_path)) {
+  meta <- read.csv(metadata_path, header = TRUE, stringsAsFactors = FALSE)
+  if (!"file" %in% colnames(meta)) {
+    stop("metadata_input.csv must contain a file column")
+  }
+  meta <- meta[!duplicated(meta$file), , drop = FALSE]
+  qc <- merge(qc, meta, by.x = "Sample", by.y = "file", all.x = TRUE)
+} else {
+  warning(paste("Metadata file not found, skipping metadata-aware plots:", metadata_path))
+}
+
+plot_dir <- paste0(workdir, "/03_Plots")
 dir.create(plot_dir, showWarnings = FALSE, recursive = TRUE)
 
 numeric_cols <- setdiff(names(qc), "Sample")
@@ -48,6 +65,7 @@ if (length(plot_metrics) > 0) {
   plot_metrics <- intersect(plot_metrics, numeric_cols)
 } else {
   plot_metrics <- head(numeric_cols, 4)
+  missing_metrics <- character(0)
 }
 
 plot_bar <- intersect(unique(c(plot_bar, plot_metrics)), numeric_cols)
@@ -68,6 +86,22 @@ if (length(plot_scatter) > 0) {
     )
   }
 }
+
+run_summary <- c(
+  paste0("QC plot summary for: ", workdir),
+  paste0("Samples: ", nrow(qc)),
+  paste0("Metadata variables requested: ", paste(metadata_vars, collapse = ", ")),
+  paste0("Metadata plot metrics: ", paste(metadata_plot_metrics, collapse = ", ")),
+  paste0("Numeric metrics available: ", length(numeric_cols)),
+  paste0("Bar plots: ", length(plot_bar)),
+  paste0("Heatmap metrics: ", length(plot_heatmap)),
+  paste0("Scatter panels: ", length(scatter_specs)),
+  paste0("Plotted metrics: ", paste(plot_metrics, collapse = ", "))
+)
+if (length(missing_metrics) > 0) {
+  run_summary <- c(run_summary, paste0("Missing plot metrics: ", paste(missing_metrics, collapse = ", ")))
+}
+writeLines(run_summary, paste0(plot_dir, "/run_summary.txt"))
 
 summary_pdf <- paste0(plot_dir, "/qc_summary_plots.pdf")
 pdf(summary_pdf, width = 11, height = 8.5)
@@ -128,6 +162,8 @@ if (length(plot_heatmap) >= 2) {
   heat_cols <- colorRampPalette(c("navy", "white", "firebrick3"))(100)
   heat_mat <- as.matrix(qc[plot_heatmap])
   rownames(heat_mat) <- qc$Sample
+  heat_mat <- scale(heat_mat)
+  heat_mat[is.na(heat_mat)] <- 0
   png(paste0(plot_dir, "/qc_metric_heatmap.png"), width = 1600, height = 1200, res = 160)
   image(
     1:ncol(heat_mat),
@@ -143,6 +179,46 @@ if (length(plot_heatmap) >= 2) {
   dev.off()
 }
 
+plot_group_boxplot <- function(metric, group_col, file_base) {
+  if (!group_col %in% names(qc)) {
+    return(invisible(NULL))
+  }
+  groups <- qc[[group_col]]
+  values <- qc[[metric]]
+  keep <- !is.na(groups) & !is.na(values)
+  if (sum(keep) < 2 || length(unique(groups[keep])) < 2) {
+    return(invisible(NULL))
+  }
+  png(paste0(plot_dir, "/", file_base, ".png"), width = 1600, height = 1200, res = 160)
+  boxplot(
+    values[keep] ~ as.factor(groups[keep]),
+    las = 2,
+    col = "steelblue2",
+    main = paste(metric, "by", group_col),
+    xlab = group_col,
+    ylab = metric
+  )
+  dev.off()
+}
+
+if (length(metadata_vars) > 0) {
+  metrics_for_group_plots <- intersect(metadata_plot_metrics, numeric_cols)
+  for (meta_var in metadata_vars) {
+    if (!meta_var %in% names(qc)) {
+      warning(paste("Skipping missing metadata variable:", meta_var))
+      next
+    }
+    if (length(metrics_for_group_plots) == 0) {
+      warning(paste("No metadata plot metrics available for", meta_var))
+      next
+    }
+    for (nm in metrics_for_group_plots) {
+      safe_name <- gsub("[^A-Za-z0-9_]+", "_", nm)
+      plot_group_boxplot(nm, meta_var, paste0(meta_var, "_boxplot_", safe_name))
+    }
+  }
+}
+
 if (length(scatter_specs) > 0) {
   for (spec in scatter_specs) {
     x <- spec$x
@@ -155,10 +231,6 @@ if (length(scatter_specs) > 0) {
     xvals <- qc[[x]]
     yvals <- qc[[y]]
     keep <- is.finite(xvals) & is.finite(yvals)
-    if (sum(keep) < 2) {
-      warning(paste("Skipping scatter trend line for", label, "- not enough finite points"))
-      next
-    }
     png(paste0(plot_dir, "/scatter_", gsub("[^A-Za-z0-9_]+", "_", label), ".png"), width = 1400, height = 1200, res = 160)
     plot(
       xvals,
@@ -169,9 +241,13 @@ if (length(scatter_specs) > 0) {
       pch = 16,
       col = "steelblue4"
     )
-    fit <- lm(yvals[keep] ~ xvals[keep])
-    if (all(is.finite(coef(fit)))) {
-      abline(fit, col = "firebrick3", lwd = 2)
+    if (sum(keep) >= 5) {
+      fit <- lm(yvals[keep] ~ xvals[keep])
+      if (all(is.finite(coef(fit)))) {
+        abline(fit, col = "firebrick3", lwd = 2)
+      }
+    } else {
+      warning(paste("Skipping scatter trend line for", label, "- fewer than 5 finite points"))
     }
     dev.off()
   }

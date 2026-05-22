@@ -31,11 +31,7 @@ for(files in file_list){
   cur_file <- cur_file[,col_select]
   
   cleaned_path <- paste0(files, ".cleaned")
-  if(file.exists(cleaned_path)){
-    next
-  }else{
-    write.table(cur_file, cleaned_path, row.names = FALSE, quote= FALSE, sep = "\t")
-  }
+  write.table(cur_file, cleaned_path, row.names = FALSE, quote= FALSE, sep = "\t")
 
 }
 

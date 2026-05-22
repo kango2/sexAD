@@ -32,9 +32,7 @@ for (i in 1:nrow(keypair)) {
         file_path <- file_path[1]
     } else {
         dest_path <- paste0(cur_dir, "/01_Inputs/", filename)
-        if (!file.exists(dest_path)) {
-            file.copy(file_path, dest_path, overwrite = TRUE)
-            message(paste("Copied", filename, "to", dest_path))
-        }
+        file.copy(file_path, dest_path, overwrite = TRUE)
+        message(paste("Copied", filename, "to", dest_path))
     }
 }

@@ -4,6 +4,15 @@
  nextflow_out: /g/data/xl04/eh8642/RNAseq_run/SPI15112_run/Male/batch2
 
  metadata: /g/data/xl04/eh8642/RNAseq_run/samplesheets/SPI5112_samplesheet_malesBatch2.csv
+ metadata_vars:
+   - group
+   - disease_status
+
+ metadata_plot_metrics:
+   - samtools_stats-reads_mapped
+   - samtools_stats-reads_mapped_percent
+   - unique_percent
+   - total_passed
 
  multiqc_args:
    - samtools_stats-reads_mapped
@@ -13,6 +22,10 @@
    - total_failed
    - lncRNA
    - unique_percent
+   - unmapped_reads
+   - bases_mapped
+   - sRNA
+   - ribozyme
 
  plot_metrics:
    - samtools_stats-reads_mapped
@@ -20,6 +33,10 @@
    - samtools_stats-reads_mapped_percent
    - unique_percent
    - total_passed
+   - unmapped_reads
+   - bases_mapped
+   - sRNA
+   - ribozyme
 
  plot_panels:
    bar:
@@ -28,6 +45,10 @@
      - samtools_stats-reads_mapped_percent
      - unique_percent
      - total_passed
+     - unmapped_reads
+     - bases_mapped
+     - sRNA
+     - ribozyme
    heatmap:
      - samtools_stats-reads_mapped
      - star-total_reads
